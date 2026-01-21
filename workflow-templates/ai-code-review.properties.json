@@ -1,0 +1,6 @@
+{
+    "name": "AI Code Review",
+    "description": "Automated AI-powered code review using Claude for pull requests. Checks code quality, security, performance, and governance alignment.",
+    "iconName": "octicon eye",
+    "categories": ["continuous-integration", "code-review"]
+}
