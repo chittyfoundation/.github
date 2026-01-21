@@ -1,0 +1,67 @@
+# AI Code Review Workflow Template
+# Standardized AI-powered code review for chittyfoundation repositories
+# Deploy to: .github/workflows/ai-code-review.yml
+
+name: AI Code Review
+
+on:
+  pull_request:
+      types: [opened, synchronize, reopened]
+
+      permissions:
+        contents: read
+          pull-requests: write
+            issues: write
+
+            jobs:
+              ai-review:
+                  name: AI Code Review
+                      runs-on: ubuntu-latest
+                          # Skip if PR is from dependabot or has skip-ai-review label
+                              if: |
+                                    github.actor != 'dependabot[bot]' &&
+                                          !contains(github.event.pull_request.labels.*.name, 'skip-ai-review')
+
+                                                  steps:
+                                                        - name: Checkout code
+                                                                uses: actions/checkout@v4
+                                                                        with:
+                                                                                  fetch-depth: 0
+
+                                                                                              - name: Get changed files
+                                                                                                      id: changed-files
+                                                                                                              uses: tj-actions/changed-files@v44
+                                                                                                                      with:
+                                                                                                                                files: |
+                                                                                                                                            **/*.ts
+                                                                                                                                                        **/*.tsx
+                                                                                                                                                                    **/*.js
+                                                                                                                                                                                **/*.jsx
+                                                                                                                                                                                            **/*.py
+                                                                                                                                                                                                        **/*.go
+                                                                                                                                                                                                                    **/*.rs
+                                                                                                                                                                                                                                **/*.yml
+                                                                                                                                                                                                                                            **/*.yaml
+                                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                        - name: Run Claude Code Review
+                                                                                                                                                                                                                                                                if: steps.changed-files.outputs.any_changed == 'true'
+                                                                                                                                                                                                                                                                        uses: anthropics/claude-code-action@beta
+                                                                                                                                                                                                                                                                                with:
+                                                                                                                                                                                                                                                                                          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+                                                                                                                                                                                                                                                                                                    model: "claude-sonnet-4-20250514"
+                                                                                                                                                                                                                                                                                                              timeout_minutes: 10
+                                                                                                                                                                                                                                                                                                                        direct_prompt: |
+                                                                                                                                                                                                                                                                                                                                    Review this pull request for:
+                                                                                                                                                                                                                                                                                                                                                1. Code quality and best practices
+                                                                                                                                                                                                                                                                                                                                                            2. Security vulnerabilities
+                                                                                                                                                                                                                                                                                                                                                                        3. Performance issues
+                                                                                                                                                                                                                                                                                                                                                                                    4. Alignment with chittyfoundation governance (chittycanon://gov/governance)
+                                                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                                                                            Focus on actionable suggestions. Be concise but thorough.
+                                                                                                                                                                                                                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                                                                                                                                                                                    PR Title: ${{ github.event.pull_request.title }}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                PR Description: ${{ github.event.pull_request.body }}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                                                                                                                      - name: Skip notification
+                                                                                                                                                                                                                                                                                                                                                                                                                                                              if: steps.changed-files.outputs.any_changed != 'true'
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                      run: echo "No reviewable files changed - skipping AI review"
