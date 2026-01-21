@@ -1,0 +1,6 @@
+{
+    "name": "Governance Checks",
+    "description": "Validates compliance with chittyfoundation governance directives from chittycanon. Checks required files, branch protection, and sensitive patterns.",
+    "iconName": "octicon shield-check",
+    "categories": ["continuous-integration", "security"]
+}
