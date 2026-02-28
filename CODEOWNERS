@@ -1,0 +1,14 @@
+# ChittyFoundation CODEOWNERS
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Foundation governance documents — require org owner approval
+FOUNDATION_VISION.md @chitcommit
+
+# Reusable CI/CD pipeline — require org owner approval
+.github/workflows/reusable-ci-pipeline.yml @chitcommit
+
+# Workflow templates — require org owner approval
+workflow-templates/ @chitcommit
+
+# Org profile
+profile/README.md @chitcommit
