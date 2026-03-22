@@ -1,49 +1,49 @@
-# Chitty Foundation
+# ChittyFoundation
 
-> Technology for Social Good
+> Making proof as frictionless as speech
 
-Non-profit technology initiatives creating positive community impact
+Independent non-profit stewarding **ChittyChain** trust infrastructure and **ChittyDNA** human rights standards for the AI age. Separate from commercial applications by design — like IETF for protocols, but for trust and verification.
 
-## Focus Areas
+## What We Build
 
-- **Civic Technology**
-- **Social Impact**
-- **Community Projects**
-- **Open Source**
+**Trust Infrastructure** — ChittyChain provides foundational, blockchain-backed trust infrastructure: immutable audit trails, cryptographic verification, and governance standards that serve the ecosystem without commercial bias.
 
-## Our Repositories
+**Human x AI Rights** — ChittyDNA establishes standards for attribution, compensation, and worker protection as AI transforms every industry. The world's first Human x AI Rights framework.
 
-Explore our projects organized by purpose and technology:
+## Core Projects
 
-### 🔍 Discover Projects
+| Project | Purpose |
+|---------|---------|
+| [ChittyChain](https://github.com/chittyfoundation/chittychain) | Trust infrastructure blockchain — consensus, verification, immutability |
+| [ChittyID](https://github.com/chittyfoundation/chittyid) | Universal identity management with P/L/T/E/A entity ontology |
+| [ChittyChronicle](https://github.com/chittyfoundation/chittychronicle) | Event logging and audit trail system |
+| [ChittyOps](https://github.com/chittyfoundation/chittyops) | Operational governance primitives and cross-organizational territories |
+| [ChittyAdvocate](https://github.com/chittyfoundation/chittyadvocate) | Doctrine narrative bootstrap for AI substrate alignment |
 
-- **By Language**: Use repository topics to filter by programming language
-- **By Purpose**: Look for repositories tagged with specific use cases
-- **By Status**: Active development vs. archived projects
+## Governance
 
-### 🚀 Getting Started
+ChittyFoundation operates as a 501(c)(3) non-profit with structural independence:
 
-1. **Browse**: Check out our pinned repositories for key projects
-2. **Contribute**: See individual repository CONTRIBUTING.md files
-3. **Connect**: Reach out via repository issues or discussions
-
-## Community
-
-- **Issues**: Report bugs and request features in individual repositories
-- **Discussions**: Join conversations in repository discussion sections
-- **Contributing**: We welcome contributions! See our contribution guidelines
+- **Independent Board** — academics, protocol architects, legal/ethics experts, community representatives
+- **Endowment-funded** — no commercial P&L pressure, no equity investments, no data monetization
+- **RFC-style standards** — 30-day public comment, 3+ expert reviews, reference implementation required
+- **Transparent operations** — all decisions publicly auditable, quarterly reports, annual third-party audits
 
 ## Standards
 
-All our repositories follow consistent standards:
+All repositories follow the ChittyCanon governance framework:
 
-- ✅ Clear documentation (README, CONTRIBUTING, LICENSE)
-- ✅ Proper tagging and descriptions  
-- ✅ Code quality practices
-- ✅ Community guidelines
+- Compliance triad: CHARTER.md (contract) + CHITTY.md (architecture) + CLAUDE.md (dev guide)
+- Canonical entity types: Person, Location, Thing, Event, Authority (P/L/T/E/A)
+- Reusable CI via [centralized workflows](.github/workflows/)
+- Claude-powered code review + governance checks
+
+## Get Involved
+
+- **Explore**: Browse repositories and read their CHARTER.md for scope
+- **Contribute**: See individual CONTRIBUTING.md files
+- **Discuss**: Open issues or discussions in any repository
 
 ---
 
-**Building quality software that makes a difference** ✨
-
-*This organization is part of the broader Chitty ecosystem of technology solutions.*
+[foundation.thechitty.com](https://foundation.thechitty.com)
