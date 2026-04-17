@@ -1,0 +1,153 @@
+# ChittyOS Cross-Organization PR Governance Workflow
+#
+# This is a REUSABLE WORKFLOW that enforces governance rules across all repos.
+# Caller repos should use:
+#
+#   uses: chittyfoundation/.github/.github/workflows/pr-governance.yml@<SHA>
+#
+# SECURITY: Always pin by SHA, never by tag or branch.
+#
+
+name: PR Governance
+
+on:
+  workflow_call:
+    inputs:
+      governance_version:
+        description: 'Version of governance rules to use (default: latest)'
+        required: false
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  verify-governance:
+    name: Verify Governance Rules Signature
+    runs-on: ubuntu-latest
+    outputs:
+      rules_valid: ${{ steps.verify.outputs.valid }}
+      rules_version: ${{ steps.verify.outputs.version }}
+    steps:
+      - name: Fetch Governance Rules
+        id: fetch
+        run: |
+          # Fetch rules from the public governance distribution repo
+          curl -sL "https://raw.githubusercontent.com/chittyfoundation/.github/${{ inputs.governance_version }}/governance/rules.json" -o rules.json
+          curl -sL "https://raw.githubusercontent.com/chittyfoundation/.github/${{ inputs.governance_version }}/governance/rules.json.sig" -o rules.json.sig
+          curl -sL "https://raw.githubusercontent.com/chittyfoundation/.github/${{ inputs.governance_version }}/governance/CANON_PUBLIC_KEY" -o CANON_PUBLIC_KEY
+
+          echo "Rules fetched from governance version: ${{ inputs.governance_version }}"
+
+      - name: Verify Signature
+        id: verify
+        run: |
+          SIGNATURE=$(jq -r '.signature.signature // empty' rules.json)
+
+          if [[ -z "$SIGNATURE" ]]; then
+            echo "::error::Governance rules are NOT SIGNED. Run the human-only signer and publish CANON_PUBLIC_KEY."
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          CANONICAL=$(jq -cS 'del(.signature.signature) | del(.signature.signed_at)' rules.json)
+          echo -n "$CANONICAL" > canonical.json
+          echo "$SIGNATURE" | base64 -d > signature.bin
+
+          if openssl pkeyutl -verify -pubin -inkey CANON_PUBLIC_KEY -sigfile signature.bin -in canonical.json; then
+            echo "::notice::Governance rules signature VERIFIED"
+            echo "valid=true" >> $GITHUB_OUTPUT
+            echo "version=$(jq -r .version rules.json)" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Governance rules signature INVALID. Rules may have been tampered with!"
+            echo "valid=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Upload Rules Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-rules
+          path: rules.json
+          retention-days: 1
+
+  check-pr-rules:
+    name: Check PR Against Rules
+    runs-on: ubuntu-latest
+    needs: verify-governance
+    if: needs.verify-governance.outputs.rules_valid == 'true'
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Rules
+        uses: actions/download-artifact@v4
+        with:
+          name: governance-rules
+
+      - name: Check Protected Files
+        id: protected-files
+        run: |
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          echo ""
+
+          PROTECTED_PATTERNS=$(jq -r '.rules.protected_files.files[]' rules.json)
+          VIOLATIONS=""
+
+          for pattern in $PROTECTED_PATTERNS; do
+            REGEX=$(echo "$pattern" | sed 's/\*\*/.*/' | sed 's/\*/.*/g')
+            while IFS= read -r file; do
+              if [[ "$file" =~ $REGEX ]]; then
+                VIOLATIONS="${VIOLATIONS}${file} matches protected pattern: ${pattern}\n"
+              fi
+            done <<< "$CHANGED_FILES"
+          done
+
+          if [[ -n "$VIOLATIONS" ]]; then
+            echo "::warning::Protected files modified - additional review required:"
+            echo -e "$VIOLATIONS"
+            echo "protected_files_changed=true" >> $GITHUB_OUTPUT
+            echo "violations<<EOF" >> $GITHUB_OUTPUT
+            echo -e "$VIOLATIONS" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "protected_files_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fetch Protected Paths
+        id: fetch-paths
+        run: |
+          curl -sL "https://raw.githubusercontent.com/chittyfoundation/.github/main/governance/protected-paths.txt" -o protected-paths.txt
+          echo "Protected paths fetched"
+
+      - name: Block AI Governance Modifications
+        id: ai-governance-block
+        run: |
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }})
+          PROTECTED_PATTERNS=$(grep -v '^#' protected-paths.txt | grep -v '^$' || true)
+
+          PROTECTED_MODIFIED=""
+          while IFS= read -r file; do
+            while IFS= read -r pattern; do
+              if [[ -n "$pattern" ]] && echo "$file" | grep -qE "$pattern"; then
+                PROTECTED_MODIFIED="${PROTECTED_MODIFIED}${file}\n"
+                break
+              fi
+            done <<< "$PROTECTED_PATTERNS"
+          done <<< "$CHANGED_FILES"
+
+          if [[ -z "$PROTECTED_MODIFIED" ]]; then
+            echo "No protected files modified"
+            exit 0
+          fi
+
+          echo "::error::Protected files modified (requires signed commits in downstream policy)."
+          echo -e "$PROTECTED_MODIFIED"
+          exit 1
+

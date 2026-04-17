@@ -1,0 +1,8 @@
+# Authoritative protected paths (regex-style) for governance enforcement.
+# These are checked to prevent AI/bot bypasses on sensitive governance/config files.
+
+^\.github/workflows/
+^\.github/CODEOWNERS$
+^CODEOWNERS$
+^governance/
+

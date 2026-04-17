@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "generated_at": "2026-04-17",
+  "notes": "Repo-level ownership gating. A CODEOWNERS principal is eligible only if its TY/VY/RY satisfies the repo requirement. Use globs for org/repo.",
+  "repos": [
+    {
+      "repo": "*/*",
+      "tier": 3,
+      "requires": { "ty": [], "vy": ["cloudflare-workers"], "ry": [] }
+    }
+  ]
+}
+

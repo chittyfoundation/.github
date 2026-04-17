@@ -1,0 +1,17 @@
+{
+  "version": "0.1.0",
+  "generated_at": "2026-04-17",
+  "principals": [
+    {
+      "github": "@chitcommit",
+      "chittyid": "PENDING-MINT",
+      "entity_type": "P",
+      "characterization": "synthetic",
+      "roles": ["portfolio-owner", "governance-authority"],
+      "ty": { "given": [], "earned": [] },
+      "vy": { "given": [], "earned": [] },
+      "ry": { "given": [], "earned": [] }
+    }
+  ]
+}
+

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChittyOS Governance Rules",
+  "type": "object",
+  "required": ["version", "signature", "rules"],
+  "properties": {
+    "version": { "type": "string" },
+    "signature": {
+      "type": "object",
+      "required": ["signature", "signed_by", "signed_at"],
+      "properties": {
+        "signature": { "type": "string" },
+        "signed_by": { "type": "string" },
+        "signed_at": { "type": "string" }
+      }
+    },
+    "rules": { "type": "object" }
+  }
+}
+

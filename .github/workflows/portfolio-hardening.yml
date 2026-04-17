@@ -1,0 +1,179 @@
+name: Portfolio Hardening
+
+on:
+  workflow_call:
+    inputs:
+      tier:
+        description: "Service tier hint (0..N). Tier 0/1 may be stricter."
+        required: false
+        type: string
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  hardening:
+    name: Portfolio Hardening Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Baseline repo hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() { echo "::error::$1"; exit 1; }
+          warn() { echo "::warning::$1"; }
+
+          OWNERS_URL="https://raw.githubusercontent.com/chittyfoundation/.github/main/governance/owners.json"
+          REQS_URL="https://raw.githubusercontent.com/chittyfoundation/.github/main/governance/repo_requirements.json"
+          curl -sL "$OWNERS_URL" -o owners.json || fail "Unable to fetch ownership registry: $OWNERS_URL"
+          curl -sL "$REQS_URL" -o repo_requirements.json || fail "Unable to fetch repo requirements: $REQS_URL"
+
+          if [[ ! -f "CODEOWNERS" && ! -f ".github/CODEOWNERS" ]]; then
+            fail "Missing CODEOWNERS (add CODEOWNERS or .github/CODEOWNERS)."
+          fi
+          if [[ ! -f "SECURITY.md" && ! -f ".github/SECURITY.md" ]]; then
+            fail "Missing SECURITY.md (add SECURITY.md or .github/SECURITY.md)."
+          fi
+
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            fail "Tracked .env detected. Remove from git and rotate any exposed secrets."
+          fi
+          ENV_DOT_FILES=$(git ls-files | grep -E '(^|/)\.env\.' || true)
+          if [[ -n "$ENV_DOT_FILES" ]]; then
+            BAD=$(echo "$ENV_DOT_FILES" | grep -vE '(^|/)\.env\.example$' || true)
+            if [[ -n "$BAD" ]]; then
+              fail "Tracked secret-like env files detected (allowed: .env.example only):\n$BAD"
+            fi
+          fi
+
+          if git ls-files | grep -qE '(^|/)node_modules/'; then
+            fail "Tracked node_modules detected. Remove from git; rely on lockfiles + CI installs."
+          fi
+          if git ls-files | grep -qE '(^|/)\\.wrangler/'; then
+            fail "Tracked .wrangler detected. Remove from git (wrangler state must be local only)."
+          fi
+
+          if [[ -f "package.json" ]]; then
+            LOCKS=0
+            [[ -f "package-lock.json" ]] && LOCKS=$((LOCKS+1))
+            [[ -f "pnpm-lock.yaml" ]] && LOCKS=$((LOCKS+1))
+            [[ -f "yarn.lock" ]] && LOCKS=$((LOCKS+1))
+
+            if [[ "$LOCKS" -eq 0 ]]; then
+              fail "package.json present but no lockfile found (package-lock.json / pnpm-lock.yaml / yarn.lock)."
+            fi
+            if [[ "$LOCKS" -gt 1 ]]; then
+              warn "Multiple lockfiles found; prefer exactly one to avoid supply-chain ambiguity."
+            fi
+          fi
+
+          if [[ -f ".github/CODEOWNERS" ]]; then
+            OWNERS_FILE=".github/CODEOWNERS"
+          else
+            OWNERS_FILE="CODEOWNERS"
+          fi
+
+          PRINCIPALS=$(sed 's/#.*$//' "$OWNERS_FILE" | tr '\t' ' ' | tr ' ' '\n' | grep '^@' | sort -u || true)
+          if [[ -z "$PRINCIPALS" ]]; then
+            warn "CODEOWNERS contains no @principals; this is unusual."
+          fi
+
+          FULL_REPO="${GITHUB_REPOSITORY}"
+          REQUIREMENT=$(jq -c --arg repo "$FULL_REPO" '
+            def glob_to_re($g):
+              "^" + ($g
+                | gsub("\\."; "\\\\.")
+                | gsub("\\*\\*"; ".*")
+                | gsub("\\*"; "[^/]*")
+              ) + "$";
+            .repos
+            | map(. + { re: (glob_to_re(.repo)) })
+            | map(select($repo | test(.re)))
+            | .[0] // empty
+          ' repo_requirements.json)
+
+          if [[ -z "$REQUIREMENT" ]]; then
+            warn "No repo requirement found for ${FULL_REPO}; skipping TY/VY/RY eligibility gating."
+            exit 0
+          fi
+
+          REQ_TY=$(echo "$REQUIREMENT" | jq -r '.requires.ty[]?' 2>/dev/null || true)
+          REQ_VY=$(echo "$REQUIREMENT" | jq -r '.requires.vy[]?' 2>/dev/null || true)
+          REQ_RY=$(echo "$REQUIREMENT" | jq -r '.requires.ry[]?' 2>/dev/null || true)
+
+          now_epoch=$(date -u +%s)
+          term_present() {
+            local row_json="$1"; local dim="$2"; local term="$3"
+            echo "$row_json" | jq -e --arg dim "$dim" --arg term "$term" '
+              ((.[ $dim ].given // []) | any(.term == $term)) or
+              ((.[ $dim ].earned // []) | any(.term == $term))
+            ' >/dev/null
+          }
+          term_is_given() {
+            local row_json="$1"; local dim="$2"; local term="$3"
+            echo "$row_json" | jq -e --arg dim "$dim" --arg term "$term" '
+              ((.[ $dim ].given // []) | any(.term == $term))
+            ' >/dev/null
+          }
+          given_expiry_ok() {
+            local row_json="$1"; local dim="$2"; local term="$3"; local exp; local exp_epoch
+            exp=$(echo "$row_json" | jq -r --arg dim "$dim" --arg term "$term" '
+              ([.[ $dim ].given[]? | select(.term == $term) | .expires_at] | .[0]) // empty
+            ')
+            [[ -n "$exp" ]] || return 2
+            exp_epoch=$(date -u -d "$exp" +%s 2>/dev/null || echo "")
+            [[ -n "$exp_epoch" ]] || return 3
+            [[ "$exp_epoch" -ge "$now_epoch" ]]
+          }
+
+          UNKNOWN=""
+          NOT_ELIGIBLE=""
+
+          while IFS= read -r principal; do
+            [[ -z "$principal" ]] && continue
+            row=$(jq -c --arg gh "$principal" '.principals[]? | select(.github==$gh)' owners.json || true)
+            if [[ -z "$row" ]]; then
+              UNKNOWN="${UNKNOWN}${principal}\n"
+              continue
+            fi
+
+            ok="true"
+            for t in $REQ_TY; do
+              term_present "$row" "ty" "$t" || ok="false"
+              if term_is_given "$row" "ty" "$t"; then
+                if ! given_expiry_ok "$row" "ty" "$t"; then ok="false"; fi
+              fi
+            done
+            for v in $REQ_VY; do
+              term_present "$row" "vy" "$v" || ok="false"
+              if term_is_given "$row" "vy" "$v"; then
+                if ! given_expiry_ok "$row" "vy" "$v"; then ok="false"; fi
+              fi
+            done
+            for r in $REQ_RY; do
+              term_present "$row" "ry" "$r" || ok="false"
+              if term_is_given "$row" "ry" "$r"; then
+                if ! given_expiry_ok "$row" "ry" "$r"; then ok="false"; fi
+              fi
+            done
+
+            if [[ "$ok" != "true" ]]; then
+              NOT_ELIGIBLE="${NOT_ELIGIBLE}${principal}\n"
+            fi
+          done <<< "$PRINCIPALS"
+
+          # Start permissive; tighten by tier later.
+          if [[ -n "$UNKNOWN" ]]; then
+            warn "CODEOWNERS principals missing from registry:\n$UNKNOWN"
+          fi
+          if [[ -n "$NOT_ELIGIBLE" ]]; then
+            warn "CODEOWNERS principals fail TY/VY/RY eligibility:\n$NOT_ELIGIBLE"
+          fi
+
