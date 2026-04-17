@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "signature": {
+    "signature": "",
+    "signed_by": "",
+    "signed_at": ""
+  },
+  "rules": {
+    "all_changes_require_pr": {
+      "id": "PR-001",
+      "name": "All Code Changes Require PR",
+      "enforcement": "block"
+    },
+    "codeowners_required": {
+      "id": "PR-002",
+      "name": "CODEOWNERS Approval Required",
+      "enforcement": "block"
+    },
+    "ai_agent_restrictions": {
+      "id": "PR-003",
+      "name": "AI Agent Restrictions",
+      "enforcement": "block"
+    },
+    "protected_files": {
+      "id": "PR-004",
+      "name": "Protected Files Extra Review",
+      "enforcement": "block",
+      "files": [
+        ".github/workflows/**",
+        ".github/CODEOWNERS",
+        "CODEOWNERS",
+        "governance/**"
+      ]
+    },
+    "commit_signing": {
+      "id": "PR-005",
+      "name": "Commit Signing",
+      "enforcement": "warn"
+    },
+    "required_status_checks": {
+      "id": "PR-006",
+      "name": "Required Status Checks",
+      "enforcement": "block"
+    }
+  }
+}
+
