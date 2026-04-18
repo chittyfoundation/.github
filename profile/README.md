@@ -35,8 +35,21 @@ All repositories follow the ChittyCanon governance framework:
 
 - Compliance triad: CHARTER.md (contract) + CHITTY.md (architecture) + CLAUDE.md (dev guide)
 - Canonical entity types: Person, Location, Thing, Event, Authority (P/L/T/E/A)
+- Fractal trinity layout: identity / authority / connectivity / scopes (see template below)
 - Reusable CI via [centralized workflows](.github/workflows/)
 - Claude-powered code review + governance checks
+
+## Starter Template (BINDING for new repos)
+
+**[chittyseed-fractal](https://github.com/chittyfoundation/chittyseed-fractal)** — every new ChittyOS repo MUST start from this template. Click "Use this template" on the GitHub repo page, or run:
+
+```bash
+gh repo create CHITTYFOUNDATION/<your-service> --template chittyfoundation/chittyseed-fractal --public
+```
+
+The template encodes the fractal trinity layout (identity / authority / connectivity), provides the standard `scope.json` manifest, CHARTER/CHITTY/CLAUDE templates, package.json with `validate:fractal` + `certify` scripts, and a CI workflow that gates merges on fractal-layout compliance.
+
+Validation contract: `chittycanon://core/services/chittyschema#meta/fractal-layout`
 
 ## Get Involved
 
