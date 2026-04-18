@@ -4,9 +4,40 @@
   "notes": "Repo-level ownership gating. A CODEOWNERS principal is eligible only if its TY/VY/RY satisfies the repo requirement. Use globs for org/repo.",
   "repos": [
     {
-      "repo": "*/*",
+      "repo": "CHITTYFOUNDATION/chittycanon",
+      "tier": 0,
+      "requires": {
+        "ty": ["canon", "ontology", "governance"],
+        "vy": ["cloudflare-workers", "github-actions"],
+        "ry": ["trust-anchor", "portfolio-policy"]
+      }
+    },
+    {
+      "repo": "CHITTYFOUNDATION/chittyid",
+      "tier": 0,
+      "requires": {
+        "ty": ["identity", "crypto", "governance"],
+        "vy": ["cloudflare-workers"],
+        "ry": ["mint", "sign", "audit"]
+      }
+    },
+    {
+      "repo": "CHITTYOS/*",
+      "tier": 2,
+      "requires": {
+        "ty": ["chittyos-runtime"],
+        "vy": ["cloudflare-workers"],
+        "ry": ["service-ops"]
+      }
+    },
+    {
+      "repo": "CHITTYAPPS/*",
       "tier": 3,
-      "requires": { "ty": [], "vy": ["cloudflare-workers"], "ry": [] }
+      "requires": {
+        "ty": ["app"],
+        "vy": ["cloudflare-workers"],
+        "ry": ["product-delivery"]
+      }
     }
   ]
 }

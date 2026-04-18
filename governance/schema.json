@@ -1,20 +1,98 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "ChittyOS Governance Rules",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "canon://governance/pr-rules/schema/v1",
+  "title": "ChittyOS PR Governance Rules Schema",
+  "description": "Schema for validating PR governance rules across the ChittyOS ecosystem",
   "type": "object",
-  "required": ["version", "signature", "rules"],
+  "required": ["version", "effective_date", "governance_id", "scope", "rules", "enforcement", "signature"],
   "properties": {
-    "version": { "type": "string" },
-    "signature": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the rules"
+    },
+    "effective_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When these rules become effective"
+    },
+    "governance_id": {
+      "type": "string",
+      "pattern": "^canon://governance/.+$",
+      "description": "Canonical identifier for this ruleset"
+    },
+    "meta": {
       "type": "object",
-      "required": ["signature", "signed_by", "signed_at"],
       "properties": {
-        "signature": { "type": "string" },
-        "signed_by": { "type": "string" },
-        "signed_at": { "type": "string" }
+        "description": { "type": "string" },
+        "authority": { "type": "string" },
+        "immutable_after_sign": { "type": "boolean" },
+        "modification_requires": { "type": "string" }
       }
     },
-    "rules": { "type": "object" }
+    "scope": {
+      "type": "object",
+      "required": ["organizations", "applies_to"],
+      "properties": {
+        "organizations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "applies_to": {
+          "type": "string",
+          "enum": ["all_repositories", "specific_repositories"]
+        },
+        "exceptions": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["rule_id", "name", "enforcement"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "pattern": "^PR-\\d{3}$"
+          },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "enforcement": {
+            "type": "string",
+            "enum": ["block", "warn", "log"]
+          }
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["strict", "permissive", "audit"]
+        },
+        "allow_admin_bypass": { "type": "boolean" },
+        "allow_force_push": { "type": "boolean" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "public_key_location"],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["Ed25519", "RSA-SHA256"]
+        },
+        "public_key_location": { "type": "string" },
+        "signed_by": { "type": "string" },
+        "signed_at": { "type": ["string", "null"], "format": "date-time" },
+        "signature": { "type": ["string", "null"] }
+      }
+    }
   }
 }
-

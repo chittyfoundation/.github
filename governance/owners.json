@@ -8,10 +8,201 @@
       "entity_type": "P",
       "characterization": "synthetic",
       "roles": ["portfolio-owner", "governance-authority"],
+      "ty": {
+        "given": [
+          {
+            "term": "canon",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "ontology",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "governance",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "portfolio-hardening",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      },
+      "vy": {
+        "given": [
+          {
+            "term": "github-actions",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "cloudflare-workers",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      },
+      "ry": {
+        "given": [
+          {
+            "term": "portfolio-policy",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "trust-anchor",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      }
+    },
+    {
+      "github": "@nickbianchi",
+      "chittyid": "PENDING-MINT",
+      "entity_type": "P",
+      "characterization": "natural",
+      "roles": ["service-owner", "governance-authority"],
+      "ty": {
+        "given": [
+          {
+            "term": "canon",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "ontology",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "governance",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "identity",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "crypto",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      },
+      "vy": {
+        "given": [
+          {
+            "term": "github-actions",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "cloudflare-workers",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      },
+      "ry": {
+        "given": [
+          {
+            "term": "portfolio-policy",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "trust-anchor",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "mint",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "sign",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          },
+          {
+            "term": "audit",
+            "authority": "chittycanon://core/services/chitty-canon",
+            "decision": "chittycanon://docs/ops/policy/chitty-canon-charter",
+            "granted_at": "2026-04-17",
+            "expires_at": "2026-07-17"
+          }
+        ],
+        "earned": []
+      }
+    },
+    {
+      "github": "@CHITTYOS/cicd-admins",
+      "chittyid": "PENDING-MINT",
+      "entity_type": "A",
+      "roles": ["cicd-admins", "workflow-owners"],
+      "ty": { "given": [], "earned": [] },
+      "vy": { "given": [], "earned": [] },
+      "ry": { "given": [], "earned": [] }
+    },
+    {
+      "github": "@CHITTYOS/developers",
+      "chittyid": "PENDING-MINT",
+      "entity_type": "A",
+      "roles": ["default-owners"],
       "ty": { "given": [], "earned": [] },
       "vy": { "given": [], "earned": [] },
       "ry": { "given": [], "earned": [] }
     }
   ]
 }
-
