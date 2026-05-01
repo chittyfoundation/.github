@@ -27,12 +27,7 @@ WORKFLOW_PATH = os.path.join(
 
 @pytest.fixture(scope="module")
 def workflow():
-    """
-    Load the GitHub Actions workflow YAML and return its parsed content.
-    
-    Returns:
-        dict: Mapping representing the workflow YAML document as parsed by PyYAML.
-    """
+    """Parse the workflow YAML once and share across tests."""
     with open(WORKFLOW_PATH) as f:
         return yaml.safe_load(f)
 
@@ -93,17 +88,6 @@ class TestYamlValidity:
 class TestInputs:
     @pytest.fixture
     def inputs(self, workflow):
-        """
-        Retrieve the `inputs` mapping under `workflow_call` from a parsed workflow document.
-        
-        Parameters:
-            workflow (dict): The YAML-parsed workflow mapping (as returned by `yaml.safe_load`),
-                where the top-level `on` key may be represented as the boolean `True` by PyYAML.
-        
-        Returns:
-            dict: Mapping of input names to their input definitions found at
-                `workflow[True]['workflow_call']['inputs']`.
-        """
         return workflow[True]["workflow_call"]["inputs"]
 
     def test_all_inputs_present(self, inputs):
@@ -162,11 +146,6 @@ class TestInputs:
         assert inputs["working-directory"]["default"] == "."
 
     def test_working_directory_type_string(self, inputs):
-        """
-        Verify that the `working-directory` workflow input is declared with type "string".
-        
-        Asserts that the `working-directory` entry in the `inputs` mapping has its `type` set to `"string"`.
-        """
         assert inputs["working-directory"]["type"] == "string"
 
     def test_all_inputs_not_required(self, inputs):
@@ -176,9 +155,7 @@ class TestInputs:
             )
 
     def test_no_extra_keys_inside_inputs(self, inputs):
-        """
-        Assert that the workflow_call `inputs` mapping does not contain the keys "secrets" or "jobs".
-        """
+        """Regression: the old broken YAML had secrets/jobs nested inside inputs."""
         assert "secrets" not in inputs
         assert "jobs" not in inputs
 
@@ -191,23 +168,9 @@ class TestInputs:
 class TestSecrets:
     @pytest.fixture
     def secrets(self, workflow):
-        """
-        Retrieve the `secrets` mapping declared under the workflow's `workflow_call` trigger.
-        
-        Parameters:
-            workflow (dict): Parsed YAML document for the workflow (the object returned by `yaml.safe_load`).
-        
-        Returns:
-            dict: Mapping of secret names to their schema objects as declared under `workflow_call.secrets`.
-        """
         return workflow[True]["workflow_call"]["secrets"]
 
     def test_anthropic_api_key_present(self, secrets):
-        """
-        Asserts the workflow_call defines an ANTHROPIC_API_KEY secret.
-        
-        Verifies that the parsed workflow's `workflow_call.secrets` mapping contains the key "ANTHROPIC_API_KEY".
-        """
         assert "ANTHROPIC_API_KEY" in secrets
 
     def test_anthropic_api_key_not_required(self, secrets):
@@ -231,24 +194,9 @@ class TestSecrets:
 class TestJobs:
     @pytest.fixture
     def jobs(self, workflow):
-        """
-        Retrieve the top-level `jobs` mapping from a parsed GitHub Actions workflow document.
-        
-        Parameters:
-            workflow (dict): Parsed workflow YAML as returned by `yaml.safe_load`.
-        
-        Returns:
-            dict: Mapping of job IDs to their job definitions (the workflow's top-level `jobs` section).
-        """
         return workflow["jobs"]
 
     def test_all_jobs_present(self, jobs):
-        """
-        Assert the workflow defines exactly the expected top-level job IDs.
-        
-        Parameters:
-            jobs (dict): Mapping of job identifiers to job definitions loaded from the workflow YAML.
-        """
         assert set(jobs.keys()) == {"detect", "lint", "test", "security", "ai-review"}
 
     def test_detect_job_name(self, jobs):
@@ -281,15 +229,6 @@ class TestJobs:
 class TestDetectJob:
     @pytest.fixture
     def detect(self, workflow):
-        """
-        Return the top-level 'detect' job mapping from a parsed workflow document.
-        
-        Parameters:
-            workflow (dict): Parsed YAML workflow mapping (as returned by yaml.safe_load).
-        
-        Returns:
-            dict: Mapping describing the 'detect' job (workflow["jobs"]["detect"]).
-        """
         return workflow["jobs"]["detect"]
 
     def test_no_needs_dependency(self, detect):
@@ -327,11 +266,6 @@ class TestDetectJob:
         assert "GITHUB_OUTPUT" in script
 
     def test_detect_script_covers_all_languages(self, detect):
-        """
-        Verify the detect job's embedded script includes detection outputs for all supported languages.
-        
-        Asserts that the `run` script of the step with id "detect" contains the strings 'language=node', 'language=python', 'language=go', and 'language=unknown'.
-        """
         detect_step = next(s for s in detect["steps"] if s.get("id") == "detect")
         script = detect_step["run"]
         assert "language=node" in script
@@ -348,24 +282,9 @@ class TestDetectJob:
 class TestLintJob:
     @pytest.fixture
     def lint(self, workflow):
-        """
-        Get the `lint` job mapping from a parsed workflow document.
-        
-        Parameters:
-            workflow (dict): Parsed YAML workflow as a mapping (the result of yaml.safe_load).
-        
-        Returns:
-            dict: Mapping representing the `lint` job definition under `workflow["jobs"]`.
-        """
         return workflow["jobs"]["lint"]
 
     def test_needs_detect(self, lint):
-        """
-        Verify the lint job declares a dependency on the detect job.
-        
-        Parameters:
-        	lint (dict): The parsed workflow mapping for the "lint" job (i.e., workflow["jobs"]["lint"]). The test asserts that the job's `needs` entry is either the string "detect" or a list that includes "detect".
-        """
         needs = lint.get("needs")
         if isinstance(needs, list):
             assert "detect" in needs
@@ -376,23 +295,10 @@ class TestLintJob:
         assert "run-lint" in str(lint.get("if", ""))
 
     def test_has_checkout_step(self, lint):
-        """
-        Verify the lint job includes a checkout step using the actions/checkout action.
-        
-        Asserts that at least one step in the provided `lint` job has a `uses` field referencing `actions/checkout`.
-        """
         step_uses = [s.get("uses", "") for s in lint["steps"]]
         assert any("actions/checkout" in u for u in step_uses)
 
     def test_node_setup_conditional_on_language(self, lint):
-        """
-        Verifies the lint job includes a Node setup step guarded by a condition that depends on the detected Node language.
-        
-        Asserts a step using `setup-node` (identified by `uses`) exists in the provided `lint` job and that the step's `if` expression contains the substring `"node"`.
-        
-        Parameters:
-            lint (dict): The parsed `lint` job mapping from the workflow YAML.
-        """
         setup_step = next(
             (s for s in lint["steps"] if "setup-node" in s.get("uses", "")), None
         )
@@ -428,29 +334,12 @@ class TestLintJob:
         assert "--ignore-scripts" in run_step["run"]
 
     def test_lint_run_uses_npm_run_lint(self, lint):
-        """
-        Asserts the lint job executes "npm run lint".
-        
-        Searches the lint job's steps for the step that runs npm (identified by containing "npm ci") and asserts that step's run command includes "npm run lint".
-        
-        Parameters:
-            lint (dict): Parsed mapping of the `lint` job from the workflow YAML.
-        """
         run_step = next(
             (s for s in lint["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
         assert "npm run lint" in run_step["run"]
 
     def test_lint_run_uses_working_directory_input(self, lint):
-        """
-        Asserts the lint job's npm run step uses the workflow `inputs.working-directory`.
-        
-        Finds the step whose `run` contains `npm ci` and verifies that its `working-directory`
-        field references `inputs.working-directory`.
-        
-        Parameters:
-        	lint (mapping): The parsed `jobs.lint` mapping from the workflow YAML.
-        """
         run_step = next(
             (s for s in lint["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
@@ -465,12 +354,6 @@ class TestLintJob:
 class TestTestJob:
     @pytest.fixture
     def test_job(self, workflow):
-        """
-        Retrieve the `test` job mapping from the parsed workflow document.
-        
-        Returns:
-            dict: The dictionary representing the `test` job specification from `workflow["jobs"]`.
-        """
         return workflow["jobs"]["test"]
 
     def test_needs_detect(self, test_job):
@@ -501,9 +384,7 @@ class TestTestJob:
         assert setup_step["with"].get("cache") == "npm"
 
     def test_test_run_uses_npm_ci_without_ignore_scripts(self, test_job):
-        """
-        Asserts the test job runs `npm ci` without the `--ignore-scripts` flag.
-        """
+        """test job uses plain 'npm ci' (no --ignore-scripts), unlike lint."""
         run_step = next(
             (s for s in test_job["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
@@ -525,15 +406,6 @@ class TestTestJob:
 class TestSecurityJob:
     @pytest.fixture
     def security(self, workflow):
-        """
-        Retrieve the top-level "security" job mapping from the parsed workflow.
-        
-        Parameters:
-            workflow (dict): Parsed GitHub Actions workflow structure (as returned by yaml.safe_load).
-        
-        Returns:
-            dict: The mapping representing the `security` job under `workflow["jobs"]`.
-        """
         return workflow["jobs"]["security"]
 
     def test_needs_detect(self, security):
@@ -562,7 +434,7 @@ class TestSecurityJob:
         assert "--audit-level=moderate" in audit_step["run"]
 
     def test_npm_audit_does_not_fail_pipeline(self, security):
-        """Ensure the npm audit command appends '|| true' to prevent audit failures from failing the workflow."""
+        """npm audit uses '|| true' so a finding does not block the pipeline."""
         audit_step = next(
             (s for s in security["steps"] if "npm audit" in str(s.get("run", ""))),
             None,
@@ -600,15 +472,6 @@ class TestSecurityJob:
 class TestAiReviewJob:
     @pytest.fixture
     def ai_review(self, workflow):
-        """
-        Get the 'ai-review' job definition from the parsed workflow.
-        
-        Parameters:
-            workflow (dict): Parsed GitHub Actions workflow mapping as returned by yaml.safe_load.
-        
-        Returns:
-            dict: The mapping representing the 'ai-review' job configuration.
-        """
         return workflow["jobs"]["ai-review"]
 
     def test_no_needs_detect(self, ai_review):
@@ -621,21 +484,10 @@ class TestAiReviewJob:
         assert "pull_request" in condition
 
     def test_permissions_contents_read(self, ai_review):
-        """
-        Assert that the `ai-review` job's permissions grant read access to repository contents.
-        
-        Parameters:
-            ai_review (dict): The parsed `ai-review` job mapping from the workflow YAML.
-        """
         perms = ai_review.get("permissions", {})
         assert perms.get("contents") == "read"
 
     def test_permissions_pull_requests_write(self, ai_review):
-        """
-        Assert the ai-review job grants write permission for pull requests.
-        
-        Checks that the job's `permissions` mapping contains `"pull-requests": "write"`.
-        """
         perms = ai_review.get("permissions", {})
         assert perms.get("pull-requests") == "write"
 
@@ -656,14 +508,6 @@ class TestAiReviewJob:
         assert "ANTHROPIC_API_KEY" in str(claude_step.get("if", ""))
 
     def test_claude_review_step_specifies_model(self, ai_review):
-        """
-        Asserts the Claude code-action step specifies a sonnet model.
-        
-        Verifies that the ai-review job contains a step using `claude-code-action` and that the step's `with.model` includes the substring `claude-sonnet`.
-        
-        Parameters:
-            ai_review (dict): The parsed `ai-review` job mapping from the workflow YAML, expected to include a `steps` sequence where each step is a mapping that may contain `uses` and `with` keys.
-        """
         claude_step = next(
             (
                 s
@@ -688,11 +532,6 @@ class TestAiReviewJob:
         assert claude_step["with"].get("timeout_minutes") == 10
 
     def test_claude_review_passes_api_key(self, ai_review):
-        """
-        Verifies the AI review step for the Claude action includes an `anthropic_api_key` input that references the `ANTHROPIC_API_KEY` secret.
-        
-        Checks that a step using `claude-code-action` provides a `with.anthropic_api_key` key and that its value contains a reference to `ANTHROPIC_API_KEY`.
-        """
         claude_step = next(
             (
                 s
@@ -727,19 +566,7 @@ fi
 
 
 def _run_detect_script(tmpdir, files_to_create):
-    """
-    Run the embedded language-detection script in a temporary directory and return the detected language.
-    
-    Parameters:
-        tmpdir (str | pathlib.Path): Path to the directory where files will be created and the script executed.
-        files_to_create (Iterable[str]): Filenames to create inside `tmpdir` before running the detection script.
-    
-    Returns:
-        str: The language value parsed from the `language=...` line written to the `GITHUB_OUTPUT` file.
-    
-    Raises:
-        AssertionError: If the detection script exits with a non-zero status or if the output file does not contain a line starting with `language=`.
-    """
+    """Create files in tmpdir, run the detect script, return the detected language."""
     for fname in files_to_create:
         open(os.path.join(tmpdir, fname), "w").close()
     output_file = os.path.join(tmpdir, "github_output")
@@ -875,3 +702,335 @@ class TestIndentationRegression:
 
     def test_ai_review_job_has_two_steps(self, workflow):
         assert len(workflow["jobs"]["ai-review"]["steps"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Step ordering: checkout must always be first
+# ---------------------------------------------------------------------------
+
+
+class TestCheckoutIsFirstStep:
+    """Each job that does a checkout should have it as the very first step."""
+
+    @pytest.mark.parametrize("job_id", ["detect", "lint", "test", "security", "ai-review"])
+    def test_first_step_is_checkout(self, workflow, job_id):
+        steps = workflow["jobs"][job_id]["steps"]
+        assert len(steps) > 0, f"Job '{job_id}' has no steps"
+        first_uses = steps[0].get("uses", "")
+        assert "actions/checkout" in first_uses, (
+            f"First step of '{job_id}' should be actions/checkout, got '{first_uses}'"
+        )
+
+    @pytest.mark.parametrize("job_id", ["detect", "lint", "test", "security", "ai-review"])
+    def test_checkout_uses_v4(self, workflow, job_id):
+        """All checkout steps must pin to @v4, not an older tag."""
+        steps = workflow["jobs"][job_id]["steps"]
+        checkout_steps = [s for s in steps if "actions/checkout" in s.get("uses", "")]
+        assert len(checkout_steps) >= 1, f"No checkout step found in '{job_id}'"
+        for step in checkout_steps:
+            assert step["uses"].endswith("@v4"), (
+                f"Checkout in '{job_id}' should use @v4, got '{step['uses']}'"
+            )
+
+
+# ---------------------------------------------------------------------------
+# Node setup action version pinning
+# ---------------------------------------------------------------------------
+
+
+class TestSetupNodeVersionPinning:
+    """Verify that setup-node uses @v4 in every job that references it."""
+
+    @pytest.mark.parametrize("job_id", ["lint", "test"])
+    def test_setup_node_uses_v4(self, workflow, job_id):
+        steps = workflow["jobs"][job_id]["steps"]
+        setup_steps = [s for s in steps if "setup-node" in s.get("uses", "")]
+        assert len(setup_steps) == 1, (
+            f"Expected exactly one setup-node step in '{job_id}', found {len(setup_steps)}"
+        )
+        assert setup_steps[0]["uses"].endswith("@v4"), (
+            f"setup-node in '{job_id}' should pin to @v4, got '{setup_steps[0]['uses']}'"
+        )
+
+    @pytest.mark.parametrize("job_id", ["lint", "test"])
+    def test_setup_node_uses_node_version_input(self, workflow, job_id):
+        """Both lint and test jobs must pass inputs.node-version to setup-node."""
+        steps = workflow["jobs"][job_id]["steps"]
+        setup_step = next(
+            (s for s in steps if "setup-node" in s.get("uses", "")), None
+        )
+        assert setup_step is not None
+        node_version_val = str(setup_step.get("with", {}).get("node-version", ""))
+        assert "inputs.node-version" in node_version_val, (
+            f"setup-node in '{job_id}' should use inputs.node-version"
+        )
+
+
+# ---------------------------------------------------------------------------
+# --if-present flag on npm run commands
+# ---------------------------------------------------------------------------
+
+
+class TestNpmIfPresentFlag:
+    """npm run lint and npm test must use --if-present so missing scripts don't fail."""
+
+    def test_lint_run_uses_if_present(self, workflow):
+        lint_steps = workflow["jobs"]["lint"]["steps"]
+        run_step = next(
+            (s for s in lint_steps if "npm run lint" in str(s.get("run", ""))), None
+        )
+        assert run_step is not None, "No 'npm run lint' step found in lint job"
+        assert "--if-present" in run_step["run"], (
+            "npm run lint should use --if-present flag"
+        )
+
+    def test_test_run_uses_if_present(self, workflow):
+        test_steps = workflow["jobs"]["test"]["steps"]
+        run_step = next(
+            (s for s in test_steps if "npm test" in str(s.get("run", ""))), None
+        )
+        assert run_step is not None, "No 'npm test' step found in test job"
+        assert "--if-present" in run_step["run"], (
+            "npm test should use --if-present flag"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Security job - checkout and working-directory
+# ---------------------------------------------------------------------------
+
+
+class TestSecurityJobDetails:
+    @pytest.fixture
+    def security(self, workflow):
+        return workflow["jobs"]["security"]
+
+    def test_has_checkout_step(self, security):
+        step_uses = [s.get("uses", "") for s in security["steps"]]
+        assert any("actions/checkout" in u for u in step_uses), (
+            "security job must have a checkout step"
+        )
+
+    def test_npm_audit_uses_working_directory_input(self, security):
+        audit_step = next(
+            (s for s in security["steps"] if "npm audit" in str(s.get("run", ""))),
+            None,
+        )
+        assert audit_step is not None
+        wd = str(audit_step.get("working-directory", ""))
+        assert "inputs.working-directory" in wd, (
+            "npm audit step should use inputs.working-directory"
+        )
+
+    def test_snyk_action_targets_node(self, security):
+        """Snyk action should be the node variant, not another language."""
+        snyk_step = next(
+            (s for s in security["steps"] if "snyk" in s.get("uses", "").lower()),
+            None,
+        )
+        assert snyk_step is not None
+        assert "node" in snyk_step["uses"], (
+            f"Snyk step should use the node action, got '{snyk_step['uses']}'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# ai-review job: condition logic and action details
+# ---------------------------------------------------------------------------
+
+
+class TestAiReviewJobDetails:
+    @pytest.fixture
+    def ai_review(self, workflow):
+        return workflow["jobs"]["ai-review"]
+
+    def test_condition_uses_logical_and(self, ai_review):
+        """The ai-review condition must require BOTH run-ai-review AND pull_request."""
+        condition = str(ai_review.get("if", ""))
+        assert "&&" in condition, (
+            "ai-review condition must use '&&' to require both run-ai-review and pull_request"
+        )
+
+    def test_permissions_has_exactly_two_entries(self, ai_review):
+        """ai-review should only grant contents:read and pull-requests:write."""
+        perms = ai_review.get("permissions", {})
+        assert len(perms) == 2, (
+            f"ai-review permissions should have exactly 2 entries, got {len(perms)}: {perms}"
+        )
+
+    def test_claude_action_uses_beta_tag(self, ai_review):
+        claude_step = next(
+            (s for s in ai_review["steps"] if "claude-code-action" in s.get("uses", "")),
+            None,
+        )
+        assert claude_step is not None
+        assert claude_step["uses"].endswith("@beta"), (
+            f"Claude action should use @beta tag, got '{claude_step['uses']}'"
+        )
+
+    def test_claude_action_uses_anthropics_org(self, ai_review):
+        claude_step = next(
+            (s for s in ai_review["steps"] if "claude-code-action" in s.get("uses", "")),
+            None,
+        )
+        assert claude_step is not None
+        assert claude_step["uses"].startswith("anthropics/"), (
+            f"Claude action should be from anthropics org, got '{claude_step['uses']}'"
+        )
+
+    def test_claude_review_model_is_not_empty(self, ai_review):
+        claude_step = next(
+            (s for s in ai_review["steps"] if "claude-code-action" in s.get("uses", "")),
+            None,
+        )
+        model = claude_step["with"].get("model", "")
+        assert model, "Claude review step must specify a non-empty model"
+
+    def test_claude_review_timeout_is_positive(self, ai_review):
+        claude_step = next(
+            (s for s in ai_review["steps"] if "claude-code-action" in s.get("uses", "")),
+            None,
+        )
+        timeout = claude_step["with"].get("timeout_minutes", 0)
+        assert isinstance(timeout, int) and timeout > 0, (
+            f"timeout_minutes should be a positive integer, got {timeout!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Input description fields
+# ---------------------------------------------------------------------------
+
+
+class TestInputDescriptions:
+    """Every input should have a non-empty description for documentation purposes."""
+
+    @pytest.fixture
+    def inputs(self, workflow):
+        return workflow[True]["workflow_call"]["inputs"]
+
+    @pytest.mark.parametrize("input_name", [
+        "node-version",
+        "python-version",
+        "run-tests",
+        "run-lint",
+        "run-security",
+        "run-ai-review",
+        "working-directory",
+    ])
+    def test_input_has_description(self, inputs, input_name):
+        desc = inputs[input_name].get("description", "")
+        assert desc, f"Input '{input_name}' must have a non-empty description"
+
+
+# ---------------------------------------------------------------------------
+# Detect script sync: hardcoded constant must match the workflow YAML
+# ---------------------------------------------------------------------------
+
+
+class TestDetectScriptSync:
+    """The DETECT_SCRIPT constant used in tests should match the actual script
+    in the workflow YAML to catch drift between the two."""
+
+    def _normalize(self, script: str) -> str:
+        """Strip leading/trailing whitespace and normalize internal whitespace."""
+        return " ".join(script.split())
+
+    def test_detect_script_constant_matches_workflow_yaml(self, workflow):
+        """If the workflow's detect script changes, DETECT_SCRIPT must be updated too."""
+        detect_step = next(
+            s for s in workflow["jobs"]["detect"]["steps"] if s.get("id") == "detect"
+        )
+        yaml_script = detect_step["run"]
+        assert self._normalize(DETECT_SCRIPT) == self._normalize(yaml_script), (
+            "DETECT_SCRIPT constant in this test file has drifted from the workflow YAML. "
+            "Update DETECT_SCRIPT to match the current workflow detect step."
+        )
+
+
+# ---------------------------------------------------------------------------
+# All steps in all jobs are properly structured (not None or non-list)
+# ---------------------------------------------------------------------------
+
+
+class TestJobStepsStructure:
+    """All jobs must have a non-empty list of steps; no step should be None."""
+
+    @pytest.mark.parametrize("job_id", ["detect", "lint", "test", "security", "ai-review"])
+    def test_steps_is_a_non_empty_list(self, workflow, job_id):
+        steps = workflow["jobs"][job_id].get("steps")
+        assert isinstance(steps, list), f"steps in '{job_id}' must be a list"
+        assert len(steps) > 0, f"steps in '{job_id}' must not be empty"
+
+    @pytest.mark.parametrize("job_id", ["detect", "lint", "test", "security", "ai-review"])
+    def test_no_step_is_none(self, workflow, job_id):
+        steps = workflow["jobs"][job_id]["steps"]
+        for i, step in enumerate(steps):
+            assert step is not None, f"Step {i} in '{job_id}' is None"
+            assert isinstance(step, dict), f"Step {i} in '{job_id}' is not a dict"
+
+
+# ---------------------------------------------------------------------------
+# Additional detect script edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestDetectScriptAdditionalEdgeCases:
+    """Extra edge cases beyond those in TestDetectScript."""
+
+    def test_requirements_txt_is_case_sensitive(self, tmp_path):
+        """Requirements.txt (capital R) should not be detected as python."""
+        lang = _run_detect_script(str(tmp_path), ["Requirements.txt"])
+        assert lang == "unknown"
+
+    def test_pyproject_toml_is_case_sensitive(self, tmp_path):
+        """PyProject.toml should not match pyproject.toml detection."""
+        lang = _run_detect_script(str(tmp_path), ["PyProject.toml"])
+        assert lang == "unknown"
+
+    def test_all_four_files_present_detects_node(self, tmp_path):
+        """When all marker files exist, node wins (checked first in the script)."""
+        lang = _run_detect_script(
+            str(tmp_path),
+            ["package.json", "requirements.txt", "pyproject.toml", "go.mod"],
+        )
+        assert lang == "node"
+
+    def test_script_output_value_contains_no_whitespace(self, tmp_path):
+        """The language value emitted must not contain leading/trailing whitespace."""
+        output_file = os.path.join(str(tmp_path), "github_output")
+        env = {**os.environ, "GITHUB_OUTPUT": output_file}
+        subprocess.run(["bash", "-c", DETECT_SCRIPT], cwd=str(tmp_path), env=env)
+        with open(output_file) as f:
+            for line in f.read().splitlines():
+                if line.startswith("language="):
+                    value = line.split("=", 1)[1]
+                    assert value == value.strip(), (
+                        f"Language value '{value}' has unexpected whitespace"
+                    )
+
+    def test_script_exits_zero_for_every_language(self, tmp_path):
+        """The detect script must always exit 0 regardless of which language is found."""
+        scenarios = [
+            ["package.json"],
+            ["requirements.txt"],
+            ["pyproject.toml"],
+            ["go.mod"],
+            [],
+        ]
+        for files in scenarios:
+            with tempfile.TemporaryDirectory() as d:
+                for fname in files:
+                    open(os.path.join(d, fname), "w").close()
+                output_file = os.path.join(d, "github_output")
+                env = {**os.environ, "GITHUB_OUTPUT": output_file}
+                result = subprocess.run(
+                    ["bash", "-c", DETECT_SCRIPT],
+                    cwd=d,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                assert result.returncode == 0, (
+                    f"Detect script exited {result.returncode} for files={files}: {result.stderr}"
+                )
