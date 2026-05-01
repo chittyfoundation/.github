@@ -27,7 +27,12 @@ WORKFLOW_PATH = os.path.join(
 
 @pytest.fixture(scope="module")
 def workflow():
-    """Parse the workflow YAML once and share across tests."""
+    """
+    Load the GitHub Actions workflow YAML and return its parsed content.
+    
+    Returns:
+        dict: Mapping representing the workflow YAML document as parsed by PyYAML.
+    """
     with open(WORKFLOW_PATH) as f:
         return yaml.safe_load(f)
 
@@ -88,6 +93,17 @@ class TestYamlValidity:
 class TestInputs:
     @pytest.fixture
     def inputs(self, workflow):
+        """
+        Retrieve the `inputs` mapping under `workflow_call` from a parsed workflow document.
+        
+        Parameters:
+            workflow (dict): The YAML-parsed workflow mapping (as returned by `yaml.safe_load`),
+                where the top-level `on` key may be represented as the boolean `True` by PyYAML.
+        
+        Returns:
+            dict: Mapping of input names to their input definitions found at
+                `workflow[True]['workflow_call']['inputs']`.
+        """
         return workflow[True]["workflow_call"]["inputs"]
 
     def test_all_inputs_present(self, inputs):
@@ -146,6 +162,11 @@ class TestInputs:
         assert inputs["working-directory"]["default"] == "."
 
     def test_working_directory_type_string(self, inputs):
+        """
+        Verify that the `working-directory` workflow input is declared with type "string".
+        
+        Asserts that the `working-directory` entry in the `inputs` mapping has its `type` set to `"string"`.
+        """
         assert inputs["working-directory"]["type"] == "string"
 
     def test_all_inputs_not_required(self, inputs):
@@ -155,7 +176,9 @@ class TestInputs:
             )
 
     def test_no_extra_keys_inside_inputs(self, inputs):
-        """Regression: the old broken YAML had secrets/jobs nested inside inputs."""
+        """
+        Assert that the workflow_call `inputs` mapping does not contain the keys "secrets" or "jobs".
+        """
         assert "secrets" not in inputs
         assert "jobs" not in inputs
 
@@ -168,9 +191,23 @@ class TestInputs:
 class TestSecrets:
     @pytest.fixture
     def secrets(self, workflow):
+        """
+        Retrieve the `secrets` mapping declared under the workflow's `workflow_call` trigger.
+        
+        Parameters:
+            workflow (dict): Parsed YAML document for the workflow (the object returned by `yaml.safe_load`).
+        
+        Returns:
+            dict: Mapping of secret names to their schema objects as declared under `workflow_call.secrets`.
+        """
         return workflow[True]["workflow_call"]["secrets"]
 
     def test_anthropic_api_key_present(self, secrets):
+        """
+        Asserts the workflow_call defines an ANTHROPIC_API_KEY secret.
+        
+        Verifies that the parsed workflow's `workflow_call.secrets` mapping contains the key "ANTHROPIC_API_KEY".
+        """
         assert "ANTHROPIC_API_KEY" in secrets
 
     def test_anthropic_api_key_not_required(self, secrets):
@@ -194,9 +231,24 @@ class TestSecrets:
 class TestJobs:
     @pytest.fixture
     def jobs(self, workflow):
+        """
+        Retrieve the top-level `jobs` mapping from a parsed GitHub Actions workflow document.
+        
+        Parameters:
+            workflow (dict): Parsed workflow YAML as returned by `yaml.safe_load`.
+        
+        Returns:
+            dict: Mapping of job IDs to their job definitions (the workflow's top-level `jobs` section).
+        """
         return workflow["jobs"]
 
     def test_all_jobs_present(self, jobs):
+        """
+        Assert the workflow defines exactly the expected top-level job IDs.
+        
+        Parameters:
+            jobs (dict): Mapping of job identifiers to job definitions loaded from the workflow YAML.
+        """
         assert set(jobs.keys()) == {"detect", "lint", "test", "security", "ai-review"}
 
     def test_detect_job_name(self, jobs):
@@ -229,6 +281,15 @@ class TestJobs:
 class TestDetectJob:
     @pytest.fixture
     def detect(self, workflow):
+        """
+        Return the top-level 'detect' job mapping from a parsed workflow document.
+        
+        Parameters:
+            workflow (dict): Parsed YAML workflow mapping (as returned by yaml.safe_load).
+        
+        Returns:
+            dict: Mapping describing the 'detect' job (workflow["jobs"]["detect"]).
+        """
         return workflow["jobs"]["detect"]
 
     def test_no_needs_dependency(self, detect):
@@ -266,6 +327,11 @@ class TestDetectJob:
         assert "GITHUB_OUTPUT" in script
 
     def test_detect_script_covers_all_languages(self, detect):
+        """
+        Verify the detect job's embedded script includes detection outputs for all supported languages.
+        
+        Asserts that the `run` script of the step with id "detect" contains the strings 'language=node', 'language=python', 'language=go', and 'language=unknown'.
+        """
         detect_step = next(s for s in detect["steps"] if s.get("id") == "detect")
         script = detect_step["run"]
         assert "language=node" in script
@@ -282,9 +348,24 @@ class TestDetectJob:
 class TestLintJob:
     @pytest.fixture
     def lint(self, workflow):
+        """
+        Get the `lint` job mapping from a parsed workflow document.
+        
+        Parameters:
+            workflow (dict): Parsed YAML workflow as a mapping (the result of yaml.safe_load).
+        
+        Returns:
+            dict: Mapping representing the `lint` job definition under `workflow["jobs"]`.
+        """
         return workflow["jobs"]["lint"]
 
     def test_needs_detect(self, lint):
+        """
+        Verify the lint job declares a dependency on the detect job.
+        
+        Parameters:
+        	lint (dict): The parsed workflow mapping for the "lint" job (i.e., workflow["jobs"]["lint"]). The test asserts that the job's `needs` entry is either the string "detect" or a list that includes "detect".
+        """
         needs = lint.get("needs")
         if isinstance(needs, list):
             assert "detect" in needs
@@ -295,10 +376,23 @@ class TestLintJob:
         assert "run-lint" in str(lint.get("if", ""))
 
     def test_has_checkout_step(self, lint):
+        """
+        Verify the lint job includes a checkout step using the actions/checkout action.
+        
+        Asserts that at least one step in the provided `lint` job has a `uses` field referencing `actions/checkout`.
+        """
         step_uses = [s.get("uses", "") for s in lint["steps"]]
         assert any("actions/checkout" in u for u in step_uses)
 
     def test_node_setup_conditional_on_language(self, lint):
+        """
+        Verifies the lint job includes a Node setup step guarded by a condition that depends on the detected Node language.
+        
+        Asserts a step using `setup-node` (identified by `uses`) exists in the provided `lint` job and that the step's `if` expression contains the substring `"node"`.
+        
+        Parameters:
+            lint (dict): The parsed `lint` job mapping from the workflow YAML.
+        """
         setup_step = next(
             (s for s in lint["steps"] if "setup-node" in s.get("uses", "")), None
         )
@@ -334,12 +428,29 @@ class TestLintJob:
         assert "--ignore-scripts" in run_step["run"]
 
     def test_lint_run_uses_npm_run_lint(self, lint):
+        """
+        Asserts the lint job executes "npm run lint".
+        
+        Searches the lint job's steps for the step that runs npm (identified by containing "npm ci") and asserts that step's run command includes "npm run lint".
+        
+        Parameters:
+            lint (dict): Parsed mapping of the `lint` job from the workflow YAML.
+        """
         run_step = next(
             (s for s in lint["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
         assert "npm run lint" in run_step["run"]
 
     def test_lint_run_uses_working_directory_input(self, lint):
+        """
+        Asserts the lint job's npm run step uses the workflow `inputs.working-directory`.
+        
+        Finds the step whose `run` contains `npm ci` and verifies that its `working-directory`
+        field references `inputs.working-directory`.
+        
+        Parameters:
+        	lint (mapping): The parsed `jobs.lint` mapping from the workflow YAML.
+        """
         run_step = next(
             (s for s in lint["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
@@ -354,6 +465,12 @@ class TestLintJob:
 class TestTestJob:
     @pytest.fixture
     def test_job(self, workflow):
+        """
+        Retrieve the `test` job mapping from the parsed workflow document.
+        
+        Returns:
+            dict: The dictionary representing the `test` job specification from `workflow["jobs"]`.
+        """
         return workflow["jobs"]["test"]
 
     def test_needs_detect(self, test_job):
@@ -384,7 +501,9 @@ class TestTestJob:
         assert setup_step["with"].get("cache") == "npm"
 
     def test_test_run_uses_npm_ci_without_ignore_scripts(self, test_job):
-        """test job uses plain 'npm ci' (no --ignore-scripts), unlike lint."""
+        """
+        Asserts the test job runs `npm ci` without the `--ignore-scripts` flag.
+        """
         run_step = next(
             (s for s in test_job["steps"] if "npm ci" in str(s.get("run", ""))), None
         )
@@ -406,6 +525,15 @@ class TestTestJob:
 class TestSecurityJob:
     @pytest.fixture
     def security(self, workflow):
+        """
+        Retrieve the top-level "security" job mapping from the parsed workflow.
+        
+        Parameters:
+            workflow (dict): Parsed GitHub Actions workflow structure (as returned by yaml.safe_load).
+        
+        Returns:
+            dict: The mapping representing the `security` job under `workflow["jobs"]`.
+        """
         return workflow["jobs"]["security"]
 
     def test_needs_detect(self, security):
@@ -434,7 +562,7 @@ class TestSecurityJob:
         assert "--audit-level=moderate" in audit_step["run"]
 
     def test_npm_audit_does_not_fail_pipeline(self, security):
-        """npm audit uses '|| true' so a finding does not block the pipeline."""
+        """Ensure the npm audit command appends '|| true' to prevent audit failures from failing the workflow."""
         audit_step = next(
             (s for s in security["steps"] if "npm audit" in str(s.get("run", ""))),
             None,
@@ -472,6 +600,15 @@ class TestSecurityJob:
 class TestAiReviewJob:
     @pytest.fixture
     def ai_review(self, workflow):
+        """
+        Get the 'ai-review' job definition from the parsed workflow.
+        
+        Parameters:
+            workflow (dict): Parsed GitHub Actions workflow mapping as returned by yaml.safe_load.
+        
+        Returns:
+            dict: The mapping representing the 'ai-review' job configuration.
+        """
         return workflow["jobs"]["ai-review"]
 
     def test_no_needs_detect(self, ai_review):
@@ -484,10 +621,21 @@ class TestAiReviewJob:
         assert "pull_request" in condition
 
     def test_permissions_contents_read(self, ai_review):
+        """
+        Assert that the `ai-review` job's permissions grant read access to repository contents.
+        
+        Parameters:
+            ai_review (dict): The parsed `ai-review` job mapping from the workflow YAML.
+        """
         perms = ai_review.get("permissions", {})
         assert perms.get("contents") == "read"
 
     def test_permissions_pull_requests_write(self, ai_review):
+        """
+        Assert the ai-review job grants write permission for pull requests.
+        
+        Checks that the job's `permissions` mapping contains `"pull-requests": "write"`.
+        """
         perms = ai_review.get("permissions", {})
         assert perms.get("pull-requests") == "write"
 
@@ -508,6 +656,14 @@ class TestAiReviewJob:
         assert "ANTHROPIC_API_KEY" in str(claude_step.get("if", ""))
 
     def test_claude_review_step_specifies_model(self, ai_review):
+        """
+        Asserts the Claude code-action step specifies a sonnet model.
+        
+        Verifies that the ai-review job contains a step using `claude-code-action` and that the step's `with.model` includes the substring `claude-sonnet`.
+        
+        Parameters:
+            ai_review (dict): The parsed `ai-review` job mapping from the workflow YAML, expected to include a `steps` sequence where each step is a mapping that may contain `uses` and `with` keys.
+        """
         claude_step = next(
             (
                 s
@@ -532,6 +688,11 @@ class TestAiReviewJob:
         assert claude_step["with"].get("timeout_minutes") == 10
 
     def test_claude_review_passes_api_key(self, ai_review):
+        """
+        Verifies the AI review step for the Claude action includes an `anthropic_api_key` input that references the `ANTHROPIC_API_KEY` secret.
+        
+        Checks that a step using `claude-code-action` provides a `with.anthropic_api_key` key and that its value contains a reference to `ANTHROPIC_API_KEY`.
+        """
         claude_step = next(
             (
                 s
@@ -566,7 +727,19 @@ fi
 
 
 def _run_detect_script(tmpdir, files_to_create):
-    """Create files in tmpdir, run the detect script, return the detected language."""
+    """
+    Run the embedded language-detection script in a temporary directory and return the detected language.
+    
+    Parameters:
+        tmpdir (str | pathlib.Path): Path to the directory where files will be created and the script executed.
+        files_to_create (Iterable[str]): Filenames to create inside `tmpdir` before running the detection script.
+    
+    Returns:
+        str: The language value parsed from the `language=...` line written to the `GITHUB_OUTPUT` file.
+    
+    Raises:
+        AssertionError: If the detection script exits with a non-zero status or if the output file does not contain a line starting with `language=`.
+    """
     for fname in files_to_create:
         open(os.path.join(tmpdir, fname), "w").close()
     output_file = os.path.join(tmpdir, "github_output")
