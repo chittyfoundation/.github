@@ -1,0 +1,71 @@
+# Auto-Arm Auto-Merge — Reusable Workflow
+# Arms `gh pr merge --auto --squash --delete-branch` on every non-draft PR.
+# Usage from a consuming repo (.github/workflows/auto-arm-merge.yml):
+#
+#   name: Auto-Arm Merge
+#   on:
+#     pull_request:
+#       types: [opened, ready_for_review, reopened]
+#   jobs:
+#     arm:
+#       uses: chittyfoundation/.github/.github/workflows/auto-arm-merge.yml@main
+#
+# Skip conditions (PR is left alone):
+#   - draft PRs
+#   - authors: dependabot[bot], renovate[bot] (they have their own auto-merge logic)
+#   - title starts with: WIP, [WIP], Draft:, DO NOT MERGE
+#   - PRs from forks (GITHUB_TOKEN lacks write on the head ref; we no-op gracefully)
+#
+# Repos consuming this MUST have:
+#   - Settings -> General -> "Allow auto-merge" enabled
+#   - Settings -> General -> "Automatically delete head branches" enabled
+#   - A branch ruleset that gates merge on required checks (otherwise auto-merge
+#     would fire instantly with no protection)
+
+name: Auto-Arm Merge (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      merge-method:
+        description: 'Merge method: squash | merge | rebase'
+        required: false
+        type: string
+        default: squash
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  arm:
+    name: Arm auto-merge
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'renovate[bot]' &&
+      !startsWith(github.event.pull_request.title, 'WIP') &&
+      !startsWith(github.event.pull_request.title, '[WIP]') &&
+      !startsWith(github.event.pull_request.title, 'Draft:') &&
+      !startsWith(github.event.pull_request.title, 'DO NOT MERGE') &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          METHOD: ${{ inputs.merge-method }}
+        run: |
+          set -euo pipefail
+          echo "Arming auto-merge on ${REPO}#${PR_NUMBER} (method=${METHOD})"
+          # --delete-branch is honored by GitHub at merge time when the repo
+          # has "Automatically delete head branches" enabled.
+          if ! gh pr merge --auto "--${METHOD}" --delete-branch \
+                --repo "${REPO}" "${PR_NUMBER}"; then
+            echo "::warning::Could not arm auto-merge on PR #${PR_NUMBER}." \
+                 "This is expected for forks, repos without auto-merge enabled," \
+                 "or PRs that are already merged/closed."
+            exit 0
+          fi
