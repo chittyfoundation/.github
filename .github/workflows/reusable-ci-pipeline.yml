@@ -114,8 +114,15 @@ jobs:
     needs: detect
     if: inputs.run-security
     runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Node.js
+        if: needs.detect.outputs.language == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
       - name: npm audit
         if: needs.detect.outputs.language == 'node'
         working-directory: ${{ inputs.working-directory }}
@@ -124,8 +131,6 @@ jobs:
         if: env.SNYK_TOKEN != ''
         uses: snyk/actions/node@master
         continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
   ai-review:
     name: AI Review
@@ -134,13 +139,13 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - name: Claude Review
         if: env.ANTHROPIC_API_KEY != ''
         uses: anthropics/claude-code-action@beta
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: "claude-sonnet-4-20250514"
