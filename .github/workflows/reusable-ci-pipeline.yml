@@ -136,9 +136,17 @@ jobs:
     name: AI Review
     if: inputs.run-ai-review && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
+    # Note: pull-requests: write must be granted by the caller workflow.
+    # A reusable workflow cannot elevate permissions beyond what the caller
+    # provides; declaring write here when the caller is read-only causes a
+    # startup_failure with no log output. Callers that want AI review to
+    # post PR comments should set permissions on the calling job, e.g.:
+    #   jobs:
+    #     ci-pipeline:
+    #       permissions:
+    #         contents: read
+    #         pull-requests: write
+    #       uses: chittyfoundation/.github/.github/workflows/reusable-ci-pipeline.yml@main
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
