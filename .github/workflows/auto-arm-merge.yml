@@ -1,0 +1,111 @@
+# Auto-Arm Auto-Merge — Reusable Workflow
+# Arms `gh pr merge --auto --squash --delete-branch` on every non-draft PR.
+# Usage from a consuming repo (.github/workflows/auto-arm-merge.yml):
+#
+#   name: Auto-Arm Merge
+#   on:
+#     pull_request:
+#       types: [opened, ready_for_review, reopened]
+#   jobs:
+#     arm:
+#       uses: chittyfoundation/.github/.github/workflows/auto-arm-merge.yml@main
+#
+# Skip conditions (PR is left alone):
+#   - draft PRs
+#   - authors: dependabot[bot], renovate[bot] (they have their own auto-merge logic)
+#   - title starts with: WIP, [WIP], Draft:, DO NOT MERGE (enforced inside the step
+#     via regex; GitHub Actions expressions lack regex, and startsWith('WIP') would
+#     false-match WIPER/WIPE)
+#   - Fork PRs are skipped at the trigger level (GITHUB_TOKEN is read-only on the
+#     head ref of a fork, so the gh call would never succeed anyway)
+#
+# Repos consuming this MUST have:
+#   - Settings -> General -> "Allow auto-merge" enabled
+#   - Settings -> General -> "Automatically delete head branches" enabled
+#   - A branch ruleset that gates merge on required checks (otherwise auto-merge
+#     would fire instantly with no protection)
+
+name: Auto-Arm Merge (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      merge-method:
+        description: 'Merge method: squash | merge | rebase'
+        required: false
+        type: string
+        default: squash
+
+# Least privilege: arming auto-merge only mutates the PR object. We do NOT need
+# contents:write — a compromised step with contents:write could push to the
+# default branch.
+permissions:
+  pull-requests: write
+
+jobs:
+  arm:
+    name: Arm auto-merge
+    runs-on: ubuntu-latest
+    # Collapse duplicate runs from rapid opened+ready_for_review sequences on the
+    # same PR. Cancel any in-flight arming for the same PR before starting a new one.
+    concurrency:
+      group: auto-arm-${{ github.repository }}-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.user.login != 'renovate[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          METHOD: ${{ inputs.merge-method }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+
+          # Preflight: gh must be present on the runner.
+          command -v gh >/dev/null || { echo "::error::gh CLI missing on runner"; exit 1; }
+
+          # Validate merge-method to prevent injecting arbitrary flags via the
+          # workflow_call input.
+          case "$METHOD" in
+            squash|merge|rebase) ;;
+            *) echo "::error::invalid merge-method '$METHOD' (must be squash/merge/rebase)"; exit 1 ;;
+          esac
+
+          # Title-prefix guard (regex-based; YAML expressions can't do regex, so
+          # this lives here). The boundary class [[:space:]:/-] (or end-of-string)
+          # ensures WIPER / WIPE / WIPED do NOT match, while accepting:
+          #   "WIP fix", "WIP: fix", "[WIP] fix", "Draft: fix", "DO NOT MERGE - x"
+          if [[ "$PR_TITLE" =~ ^(WIP|\[WIP\]|Draft:|DO[[:space:]]NOT[[:space:]]MERGE)([[:space:]:/-]|$) ]]; then
+            echo "::notice::skipped — title prefix signals not-ready: $PR_TITLE"
+            exit 0
+          fi
+
+          echo "Arming auto-merge on ${REPO}#${PR_NUMBER} (method=${METHOD})"
+          # --delete-branch is honored by GitHub at merge time when the repo
+          # has "Automatically delete head branches" enabled.
+          set +e
+          err=$(gh pr merge --auto "--${METHOD}" --delete-branch --repo "${REPO}" "${PR_NUMBER}" 2>&1)
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice::auto-merge armed for ${REPO}#${PR_NUMBER} (${METHOD})"
+            exit 0
+          fi
+          case "$err" in
+            *"Pull request is not mergeable"*|*"already"*|*"closed"*)
+              echo "::notice::benign skip (${REPO}#${PR_NUMBER}): $err"; exit 0 ;;
+            *"auto merge is not allowed"*|*"not enabled"*)
+              echo "::error::repo missing allow_auto_merge=true on ${REPO}"; exit 1 ;;
+            *"not allowed to merge"*|*"merge method"*)
+              echo "::error::merge-method '${METHOD}' not permitted on ${REPO} (ruleset/setting): $err"; exit 1 ;;
+            *"HTTP 401"*|*"HTTP 403"*|*"Bad credentials"*|*"Resource not accessible"*)
+              echo "::error::token scope/auth (${REPO}): $err"; exit 1 ;;
+            *)
+              echo "::error::unexpected gh failure (${REPO}#${PR_NUMBER}, rc=${rc}): $err"; exit 1 ;;
+          esac
