@@ -1,47 +1,140 @@
 {
+  "$schema": "./schema.json",
   "version": "1.0.0",
-  "signature": {
-    "signature": "",
-    "signed_by": "",
-    "signed_at": ""
+  "effective_date": "2026-01-19T00:00:00Z",
+  "governance_id": "canon://governance/pr-rules/v1",
+
+  "meta": {
+    "description": "ChittyOS Cross-Organization PR Governance Rules",
+    "authority": "CHITTYFOUNDATION",
+    "immutable_after_sign": true,
+    "modification_requires": "human_signature_with_new_key"
   },
+
+  "scope": {
+    "organizations": [
+      "CHITTYFOUNDATION",
+      "CHITTYOS",
+      "CHITTYAPPS",
+      "CHITTYCORP",
+      "CHICAGOAPPS",
+      "FURNISHED-CONDOS"
+    ],
+    "applies_to": "all_repositories",
+    "exceptions": []
+  },
+
   "rules": {
-    "all_changes_require_pr": {
-      "id": "PR-001",
+    "code_changes": {
+      "rule_id": "PR-001",
       "name": "All Code Changes Require PR",
-      "enforcement": "block"
+      "description": "No direct commits to protected branches. All changes must go through pull request workflow.",
+      "enforcement": "block",
+      "protected_branches": ["main", "master", "production", "release/*"],
+      "applies_to_paths": ["**/*"],
+      "exceptions": {
+        "allowed_direct_push": false,
+        "admin_override": false,
+        "ai_override": false
+      }
     },
+
     "codeowners_required": {
-      "id": "PR-002",
+      "rule_id": "PR-002",
       "name": "CODEOWNERS Approval Required",
-      "enforcement": "block"
+      "description": "All PRs must be approved by designated code owners before merge.",
+      "enforcement": "block",
+      "minimum_approvals": 1,
+      "dismiss_stale_reviews": true,
+      "require_code_owner_reviews": true,
+      "ai_approval_valid": false
     },
+
     "ai_agent_restrictions": {
-      "id": "PR-003",
+      "rule_id": "PR-003",
       "name": "AI Agent Restrictions",
-      "enforcement": "block"
+      "description": "AI agents (Claude, etc.) cannot bypass PR workflow even when instructed.",
+      "enforcement": "block",
+      "restrictions": [
+        "cannot_merge_directly",
+        "cannot_approve_own_prs",
+        "cannot_modify_governance_files",
+        "cannot_modify_workflow_files",
+        "cannot_modify_codeowners"
+      ],
+      "must_use_pr": true,
+      "human_approval_required": true
     },
+
     "protected_files": {
-      "id": "PR-004",
-      "name": "Protected Files Extra Review",
+      "rule_id": "PR-004",
+      "name": "Protected Files Require Extra Review",
+      "description": "Critical files require additional human review.",
       "enforcement": "block",
       "files": [
         ".github/workflows/**",
         ".github/CODEOWNERS",
         "CODEOWNERS",
-        "governance/**"
-      ]
+        "governance/**",
+        "wrangler.toml",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "*.config.js",
+        "*.config.ts",
+        "migrations/**",
+        ".env*",
+        "secrets/**"
+      ],
+      "required_reviewers": ["@CHITTYOS/governance"],
+      "minimum_approvals": 2
     },
+
     "commit_signing": {
-      "id": "PR-005",
-      "name": "Commit Signing",
-      "enforcement": "warn"
+      "rule_id": "PR-005",
+      "name": "Commit Signing Recommended",
+      "description": "Commits should be signed for verification.",
+      "enforcement": "warn",
+      "require_signed_commits": false,
+      "recommend_signed_commits": true
     },
-    "required_status_checks": {
-      "id": "PR-006",
+
+    "status_checks": {
+      "rule_id": "PR-006",
       "name": "Required Status Checks",
-      "enforcement": "block"
+      "description": "All required CI checks must pass before merge.",
+      "enforcement": "block",
+      "required_checks": [
+        "governance-verify",
+        "build",
+        "test"
+      ],
+      "strict": true
     }
+  },
+
+  "enforcement": {
+    "mode": "strict",
+    "allow_admin_bypass": false,
+    "allow_force_push": false,
+    "delete_branch_on_merge": true,
+    "require_linear_history": false,
+    "require_conversation_resolution": true
+  },
+
+  "audit": {
+    "log_all_merges": true,
+    "log_all_approvals": true,
+    "log_all_bypasses": true,
+    "retention_days": 365,
+    "notify_on_violation": ["governance@chitty.cc"]
+  },
+
+  "signature": {
+    "algorithm": "Ed25519",
+    "public_key_location": "./CANON_PUBLIC_KEY",
+    "signed_by": "HUMAN_OPERATOR",
+    "signed_at": null,
+    "signature": null
   }
 }
-

@@ -1,8 +1,34 @@
-# Authoritative protected paths (regex-style) for governance enforcement.
-# These are checked to prevent AI/bot bypasses on sensitive governance/config files.
+# ChittyCanon Protected Paths
+# These patterns are fetched by hooks at runtime from GitHub
+# AI agents CANNOT modify this file (requires PR + human approval)
+#
+# Format: regex patterns, one per line
+# Lines starting with # are comments
 
-^\.github/workflows/
-^\.github/CODEOWNERS$
-^CODEOWNERS$
-^governance/
+# Governance core files
+governance/sign-rules\.sh$
+governance/deploy-governance\.sh$
+governance/rules\.json$
+governance/rules\.json\.sig$
+governance/schema\.json$
+governance/CANON_PUBLIC_KEY$
+governance/caller-workflow\.yml$
+governance/KEY_ISOLATION\.md$
+governance/README\.md$
+governance/protected-paths\.txt$
 
+# Any file in governance directory
+/governance/[^/]+$
+
+# Hook self-protection
+\.claude/hooks/block-governance-edits\.py$
+\.claude/hooks/
+
+# GitHub workflow protection
+\.github/workflows/pr-governance\.yml$
+\.github/workflows/governance
+\.github/CODEOWNERS$
+CODEOWNERS$
+
+# Settings protection (prevents disabling hooks)
+\.claude/settings.*\.json$
