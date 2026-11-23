@@ -42,6 +42,11 @@ on:
         required: false
         type: string
         default: '.'
+      runner-labels:
+        description: 'JSON array of runner labels for every job; foundation repos on the self-hosted pool pass ''["self-hosted","chittyserv"]'''
+        required: false
+        type: string
+        default: '["ubuntu-latest"]'
     secrets:
       ANTHROPIC_API_KEY:
         required: false
@@ -51,7 +56,7 @@ on:
 jobs:
   detect:
     name: Detect Language
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
     outputs:
       language: ${{ steps.detect.outputs.language }}
     steps:
@@ -73,7 +78,7 @@ jobs:
     name: Lint
     needs: detect
     if: inputs.run-lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -93,7 +98,7 @@ jobs:
     name: Test
     needs: detect
     if: inputs.run-tests
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -113,7 +118,7 @@ jobs:
     name: Security Scan
     needs: detect
     if: inputs.run-security
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
     env:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
     steps:
@@ -135,7 +140,7 @@ jobs:
   ai-review:
     name: AI Review
     if: inputs.run-ai-review && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
     # Note: pull-requests: write must be granted by the caller workflow.
     # A reusable workflow cannot elevate permissions beyond what the caller
     # provides; declaring write here when the caller is read-only causes a
