@@ -43,7 +43,7 @@ on:
         type: string
         default: '.'
       runner-labels:
-        description: 'JSON array of runner labels for every job; foundation repos on the self-hosted pool pass ''["self-hosted","chittyserv"]'''
+        description: 'JSON array of runner labels (runs-on) for every job'
         required: false
         type: string
         default: '["ubuntu-latest"]'
